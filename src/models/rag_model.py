@@ -14,7 +14,8 @@ class RAGModel:
     def __init__(self,
                  model_name: str = "google/flan-t5-base",
                  max_length: int = 2048,
-                 quantization: Optional[str] = None):
+                 quantization: Optional[str] = None,
+                 gcs_bucket: str = None):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using device: {self.device}")
@@ -40,7 +41,7 @@ class RAGModel:
         self._configure_model_parameters(max_length)
         
         # Initialize data loader
-        self.loader = DataLoader()
+        self.loader = DataLoader(bucket_name=gcs_bucket)
         self.load_data()
 
     def _get_quantization_config(self, quantization: str) -> Optional[BitsAndBytesConfig]:

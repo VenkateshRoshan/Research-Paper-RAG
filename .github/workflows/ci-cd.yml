@@ -1,0 +1,68 @@
+name: RAG API CI/CD
+
+on:
+    push:
+        branches:
+            main
+    pull_request:
+        branches:
+            main
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Set up Python 3.10
+              uses: actions/setup-python@v3
+              with:
+                  python-version: 3.10
+
+            - name: Install dependencies
+              run: |
+                    python -m pip install --upgrade pip
+                    pip install -r requirements.txt
+                    pip install pytest pytest-asyncio pytest-cov
+
+            - name: Run tests
+              run: |
+                    pytest tests/ -v --cov=src --cov-report=xml
+
+            - name: Upload coverage reports
+              uses: codecov/codecov-action@v3
+              with:
+                    file: ./coverage.xml
+                    fail_ci_if_error: true
+
+    deploy-vertex:
+        needs: test
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup Cloud SDK
+              uses: google-github-actions/setup-gcloud@v1
+              with:
+                project-id: ${{ secrets.GCP_PROJECT_ID }}
+                service_account_key: ${{ secrets.GCP_SA_KEY }}
+                export_default_credentials: true
+
+            - name: Deploy to Vertex AI by pulling dockerhub
+              run: |
+                gcloud beta ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
+                    --region=${{ secrets.GCP_REGION }} \
+                    --image=docker.io/${{ secrets.DOCKERHUB_USERNAME}}/research-paper-rag:latest \
+                    --machine-type=n1-standard-4 \
+                    --min-replica-count=1 \
+                    --max-replica-count=3 \
+                    --traffic-split=0=100
+
+            - name: Get deployed model ID
+              run: |
+                export MODEL_ID=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} --region=${{ secrets.GCP_REGION }} --format='value(deployedModels[0].id)')
+                echo "Deployed model ID: $MODEL_ID"
+
+            

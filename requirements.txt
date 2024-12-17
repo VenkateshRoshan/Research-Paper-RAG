@@ -36,3 +36,5 @@ pytest-asyncio
 pytest-cov
 
 httpx
+
+google-cloud-storage
