@@ -1,0 +1,15 @@
+# add __pycache__ to .gitignore
+__pycache__/
+
+# add data/ to .gitignore
+data/
+
+# add src/__pycache__ to .gitignore
+src/__pycache__/
+src/data/__pycache__/
+src/models/__pycache__/
+src/monitoring/__pycache__/
+
+.dvcignore
+
+venv/
