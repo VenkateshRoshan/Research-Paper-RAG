@@ -78,12 +78,12 @@ class RAGModel:
         self.model.config.max_length = max_length
         self.max_length = max_length
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(stop=stop_after_attempt(1), wait=wait_exponential(multiplier=1, min=4, max=10))
     def generate_response(self,
                          query: str,
                          max_new_tokens: int = 150,
-                         temperature: float = 0.8,
-                         num_papers: int = 3,
+                         temperature: float = 0.7,
+                         num_papers: int = 1,
                          style: str = 'academic') -> Dict:
         """Generate response for the query using RAG with retry mechanism"""
         try:

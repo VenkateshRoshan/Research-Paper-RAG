@@ -33,6 +33,8 @@ class DataLoader:
         # self.save_to_gcs((Path(__file__).resolve().parent / "../../data/processed/embeddings.pkl").resolve(), 'embeddings.pkl')
         # self.save_to_gcs((Path(__file__).resolve().parent / "../../data/processed/faiss.index").resolve(), 'faiss.index')
 
+        self.load_and_process_data(sample_size=1000)
+
     def save_to_gcs(self, source_path: str, destination_blob_name: str) -> None:
         """Upload a file to Google Cloud Storage"""
         try:
