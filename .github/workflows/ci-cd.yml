@@ -77,25 +77,41 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Google Auth
+        if: always()
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set up Cloud SDK
+        if: always()
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Configure Docker for GCR
+        if: always()
+        run: gcloud auth configure-docker --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
             
-      - name: Build and push Docker image
+      - name: Build and push Docker images
+        if: always()
         run: |
-            docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} .
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
-    
-    #   - name: Build and push Docker image
-    #     uses: docker/build-push-action@v4
-    #     with:
-    #       context: .
-    #       push: true
-    #       tags: |
-    #         ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-    #         ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
-    #       cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache
-    #       cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache,mode=max
+          # Build the image
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} .
+          
+          # Tag for GCR
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+          
+          # Push to DockerHub
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+          
+          # Push to GCR
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
 
   deploy-vertex:
     needs: build-and-push
@@ -106,6 +122,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Google Auth
+        if: always()
         id: auth
         uses: google-github-actions/auth@v1
         with:
@@ -113,15 +130,36 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Set up Cloud SDK
+        if: always()
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Deploy to Vertex AI
+      - name: Upload model to Vertex AI
+        if: always()
         run: |
-          gcloud auth configure-docker --quiet
-          gcloud components install beta --quiet
-          gcloud beta ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
+          # Upload the model
+          gcloud ai models upload \
             --region=${{ secrets.GCP_REGION }} \
-            --container-image-uri=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+            --display-name=research-paper-rag \
+            --container-image-uri=gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+            --container-ports=8080 \
+            --container-predict-route=/predict \
+            --container-health-route=/health
+
+          # Store the model ID
+          MODEL_ID=$(gcloud ai models list \
+            --region=${{ secrets.GCP_REGION }} \
+            --filter="display_name=research-paper-rag" \
+            --format="value(name)" \
+            --limit=1)
+          echo "MODEL_ID=${MODEL_ID}" >> $GITHUB_ENV
+
+      - name: Deploy to Vertex AI endpoint
+        if: always()
+        run: |
+          gcloud ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --model=${{ env.MODEL_ID }} \
+            --display-name=research-paper-rag-endpoint \
             --machine-type=n1-standard-4 \
             --min-replica-count=1 \
             --max-replica-count=3 \
@@ -129,12 +167,13 @@ jobs:
             --quiet
 
       - name: Verify Deployment
+        if: always()
         run: |
           # Wait for deployment to complete
           sleep 60
           
           # Get deployment status
-          DEPLOYMENT_STATUS=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
+          DEPLOYMENT_STATUS=$(gcloud ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
             --format='value(deployedModels[0].state)' --quiet)
           
@@ -144,7 +183,7 @@ jobs:
           fi
           
           # Get and log the endpoint URL
-          ENDPOINT_URL=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
+          ENDPOINT_URL=$(gcloud ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
             --format='value(deployedModels[0].uri)' --quiet)
           echo "Endpoint URL: $ENDPOINT_URL"
@@ -156,7 +195,7 @@ jobs:
             echo "Project ID: ${{ secrets.GCP_PROJECT_ID }}"
             echo "Region: ${{ secrets.GCP_REGION }}"
             echo "Endpoint ID: ${{ secrets.VERTEX_ENDPOINT_ID }}"
-            echo "Docker Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}"
+            echo "Docker Image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}"
 
       - name: Deployment Notification
         if: always()
