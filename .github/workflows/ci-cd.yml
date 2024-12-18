@@ -1,68 +1,151 @@
 name: RAG API CI/CD
 
 on:
-    push:
-        branches:
-            main
-    pull_request:
-        branches:
-            main
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: '3.10'
+  DOCKER_IMAGE_NAME: research-paper-rag
+  DOCKER_IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v3
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-            - name: Set up Python 3.10
-              uses: actions/setup-python@v3
-              with:
-                  python-version: 3.10
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
 
-            - name: Install dependencies
-              run: |
-                    python -m pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pip install pytest pytest-asyncio pytest-cov
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-            - name: Run tests
-              run: |
-                    pytest tests/ -v --cov=src --cov-report=xml
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov pytest-mock
 
-            - name: Upload coverage reports
-              uses: codecov/codecov-action@v3
-              with:
-                    file: ./coverage.xml
-                    fail_ci_if_error: true
+      - name: Run linting
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --statistics
 
-    deploy-vertex:
-        needs: test
-        runs-on: ubuntu-latest
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=src --cov-report=xml
 
-        steps:
-            - uses: actions/checkout@v3
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true
 
-            - name: Setup Cloud SDK
-              uses: google-github-actions/setup-gcloud@v1
-              with:
-                project-id: ${{ secrets.GCP_PROJECT_ID }}
-                service_account_key: ${{ secrets.GCP_SA_KEY }}
-                export_default_credentials: true
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
 
-            - name: Deploy to Vertex AI by pulling dockerhub
-              run: |
-                gcloud beta ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
-                    --region=${{ secrets.GCP_REGION }} \
-                    --image=docker.io/${{ secrets.DOCKERHUB_USERNAME}}/research-paper-rag:latest \
-                    --machine-type=n1-standard-4 \
-                    --min-replica-count=1 \
-                    --max-replica-count=3 \
-                    --traffic-split=0=100
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Get deployed model ID
-              run: |
-                export MODEL_ID=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} --region=${{ secrets.GCP_REGION }} --format='value(deployedModels[0].id)')
-                echo "Deployed model ID: $MODEL_ID"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache,mode=max
+
+  deploy-vertex:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Deploy to Vertex AI
+        run: |
+          gcloud auth configure-docker
+          gcloud beta ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --image=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+            --machine-type=n1-standard-4 \
+            --min-replica-count=1 \
+            --max-replica-count=3 \
+            --traffic-split=0=100
+
+      - name: Verify Deployment
+        run: |
+          # Wait for deployment to complete
+          sleep 60
+          
+          # Get deployment status
+          DEPLOYMENT_STATUS=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --format='value(deployedModels[0].state)')
+          
+          if [ "$DEPLOYMENT_STATUS" != "DEPLOYED" ]; then
+            echo "Deployment failed with status: $DEPLOYMENT_STATUS"
+            exit 1
+          fi
+          
+          # Get and log the endpoint URL
+          ENDPOINT_URL=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --format='value(deployedModels[0].uri)')
+          echo "Endpoint URL: $ENDPOINT_URL"
+
+      - name: Deployment Notification
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { status, conclusion } = context.job
+            const message = `Deployment to Vertex AI ${conclusion === 'success' ? 'succeeded' : 'failed'}`
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: message
+            })
