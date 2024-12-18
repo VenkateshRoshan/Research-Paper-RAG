@@ -35,8 +35,8 @@ pytest
 pytest-asyncio
 pytest-cov
 pytest-mock
+python-multipart==0.0.6
 
 httpx
 
 google-cloud-storage
-

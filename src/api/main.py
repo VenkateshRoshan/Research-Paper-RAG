@@ -7,8 +7,9 @@ from datetime import datetime
 import logging
 import uvicorn
 from src.models.rag_model import RAGModel
-
 from src.monitoring.metrics import track_query_metrics
+import os
+
 from prometheus_client import make_asgi_app
 
 # Configure logging
@@ -61,6 +62,11 @@ class QueryResponse(BaseModel):
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now()}
 
+# Health check endpoint required by Vertex AI
+@app.get(os.getenv("AIP_HEALTH_ROUTE", "/health"))
+async def health():
+    return {"status": "healthy"}
+
 # Main query endpoint
 @app.post("/query", response_model=QueryResponse)
 @track_query_metrics
@@ -86,7 +92,8 @@ async def process_query(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 
 """
     curl -X POST "http://localhost:8080/query"   -H "Content-Type: application/json"   -d '{

@@ -1,22 +1,37 @@
-FROM python:3.10-slim
+# Use CUDA base image for GPU support
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
+# Set working directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
     build-essential \
-    git
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Copy application code
 COPY src/ src/
-COPY tests/ tests/
 COPY main.py .
-COPY prometheus.yml .
+
+# Set environment variables for Vertex AI
+ENV AIP_PREDICT_ROUTE=/predict
+ENV AIP_HEALTH_ROUTE=/health
+ENV PORT=8080
+
+# Create a non-root user
+RUN useradd -m -u 1000 appuser
+RUN chown -R appuser:appuser /app
+USER appuser
 
 # Expose the port
-EXPOSE 8080
+EXPOSE ${PORT}
 
-# RUN python main.py
-CMD ["python", "src/api/main.py"]
+# Start the FastAPI server
+CMD ["python3", "main.py"]
