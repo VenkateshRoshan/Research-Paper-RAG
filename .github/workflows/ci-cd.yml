@@ -124,7 +124,8 @@ jobs:
             --machine-type=n1-standard-4 \
             --min-replica-count=1 \
             --max-replica-count=3 \
-            --traffic-split=0=100
+            --traffic-split=0=100 \
+            --quiet
 
       - name: Verify Deployment
         run: |
@@ -134,7 +135,8 @@ jobs:
           # Get deployment status
           DEPLOYMENT_STATUS=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
-            --format='value(deployedModels[0].state)')
+            --format='value(deployedModels[0].state)') \
+            --quiet
           
           if [ "$DEPLOYMENT_STATUS" != "DEPLOYED" ]; then
             echo "Deployment failed with status: $DEPLOYMENT_STATUS"
@@ -144,8 +146,18 @@ jobs:
           # Get and log the endpoint URL
           ENDPOINT_URL=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
-            --format='value(deployedModels[0].uri)')
+            --format='value(deployedModels[0].uri)') \
+            --quiet
           echo "Endpoint URL: $ENDPOINT_URL"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+            echo "Deployment Status: ${{ job.status }}"
+            echo "Project ID: ${{ secrets.GCP_PROJECT_ID }}"
+            echo "Region: ${{ secrets.GCP_REGION }}"
+            echo "Endpoint ID: ${{ secrets.VERTEX_ENDPOINT_ID }}"
+            echo "Docker Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}"
 
       - name: Deployment Notification
         if: always()
