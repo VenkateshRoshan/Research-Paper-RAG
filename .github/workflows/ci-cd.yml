@@ -117,7 +117,8 @@ jobs:
 
       - name: Deploy to Vertex AI
         run: |
-          gcloud auth configure-docker
+          gcloud auth configure-docker --quiet
+          gcloud components install beta --quiet
           gcloud beta ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
             --image=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
@@ -135,8 +136,7 @@ jobs:
           # Get deployment status
           DEPLOYMENT_STATUS=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
-            --format='value(deployedModels[0].state)') \
-            --quiet
+            --format='value(deployedModels[0].state)' --quiet)
           
           if [ "$DEPLOYMENT_STATUS" != "DEPLOYED" ]; then
             echo "Deployment failed with status: $DEPLOYMENT_STATUS"
@@ -146,8 +146,7 @@ jobs:
           # Get and log the endpoint URL
           ENDPOINT_URL=$(gcloud beta ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
-            --format='value(deployedModels[0].uri)') \
-            --quiet
+            --format='value(deployedModels[0].uri)' --quiet)
           echo "Endpoint URL: $ENDPOINT_URL"
 
       - name: Deployment Summary
