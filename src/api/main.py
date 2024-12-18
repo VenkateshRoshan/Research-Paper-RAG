@@ -67,8 +67,7 @@ async def health_check():
 async def process_query(request: QueryRequest):
     try:
 
-        if model is None:
-            model = get_model()
+        model = get_model()
         # Generate response using RAG model
         result = model.generate_response(
             query=request.query,
