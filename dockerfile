@@ -16,4 +16,4 @@ COPY main.py .
 COPY prometheus.yml .
 
 # RUN python main.py
-CMD ["python", "main.py"]
+CMD ["python", "src/api/main.py"]
