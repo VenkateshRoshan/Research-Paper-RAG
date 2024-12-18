@@ -6,9 +6,9 @@ from typing import List, Optional, Dict
 from datetime import datetime
 import logging
 import uvicorn
-from models.rag_model import RAGModel
+from src.models.rag_model import RAGModel
 
-from monitoring.metrics import track_query_metrics
+from src.monitoring.metrics import track_query_metrics
 from prometheus_client import make_asgi_app
 
 # Configure logging
