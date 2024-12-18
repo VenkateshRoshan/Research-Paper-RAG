@@ -15,5 +15,8 @@ COPY tests/ tests/
 COPY main.py .
 COPY prometheus.yml .
 
+# Expose the port
+EXPOSE 8080
+
 # RUN python main.py
 CMD ["python", "src/api/main.py"]
