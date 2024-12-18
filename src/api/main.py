@@ -27,7 +27,13 @@ metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
 # Initialize RAG model
-model = RAGModel(gcs_bucket='research-paper-rag-data')
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        model = RAGModel(gcs_bucket='research-paper-rag-data')
+    return model
 
 # Pydantic models for request/response validation
 class QueryRequest(BaseModel):
@@ -60,6 +66,9 @@ async def health_check():
 @track_query_metrics
 async def process_query(request: QueryRequest):
     try:
+
+        if model is None:
+            model = get_model()
         # Generate response using RAG model
         result = model.generate_response(
             query=request.query,
