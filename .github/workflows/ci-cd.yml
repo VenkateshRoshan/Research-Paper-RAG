@@ -65,26 +65,26 @@ jobs:
     #       file: ./coverage.xml
     #       fail_ci_if_error: true
 
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v3
+#   build-and-push:
+#     needs: test
+#     runs-on: ubuntu-latest
+#     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#     steps:
+#       - uses: actions/checkout@v3
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+#       - name: Login to DockerHub
+#         uses: docker/login-action@v2
+#         with:
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v2
             
-      - name: Build and push Docker image
-        run: |
-            docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} .
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+#       - name: Build and push Docker image
+#         run: |
+#             docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} .
+#             docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
     
     #   - name: Build and push Docker image
     #     uses: docker/build-push-action@v4
@@ -121,7 +121,7 @@ jobs:
           gcloud components install beta --quiet
           gcloud beta ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
             --region=${{ secrets.GCP_REGION }} \
-            --image=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+            --container-image-uri=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
             --machine-type=n1-standard-4 \
             --min-replica-count=1 \
             --max-replica-count=3 \
