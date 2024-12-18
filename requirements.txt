@@ -34,7 +34,9 @@ prometheus-client
 pytest
 pytest-asyncio
 pytest-cov
+pytest-mock
 
 httpx
 
 google-cloud-storage
+
