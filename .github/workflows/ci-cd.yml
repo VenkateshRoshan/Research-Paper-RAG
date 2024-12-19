@@ -72,22 +72,29 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
 
-    - name: list models
+    - name: List Models
+      id: list_models
       run: |
-        gcloud ai models list --region=${{ env.REGION }}
-
-    - name: Create Custom Model
+        MODELS=$(gcloud ai models list --region=${{ env.REGION }} --format="value(name)")
+        echo "models=${MODELS}" >> $GITHUB_ENV
+    
+    - name: Conditionally Create Custom Model
       id: create_model
       run: |
-        MODEL_ID=$(gcloud ai models upload \
-          --region=${{ env.REGION }} \
-          --display-name=${{ env.MODEL_NAME }} \
-          --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main)
-        
-        echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
-        
-        # Wait for model to be ready
-        gcloud ai models $MODEL_ID --region=${{ env.REGION }}
+        if [ -z "${MODELS}" ]; then
+          MODEL_ID=$(gcloud ai models upload \
+            --region=${{ env.REGION }} \
+            --display-name=${{ env.MODEL_NAME }} \
+            --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main)
+          
+          echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
+          
+          # Wait for model to be ready
+          gcloud ai models describe $MODEL_ID --region=${{ env.REGION }}
+        else
+          echo "Existing models found. Skipping model creation." >> $GITHUB_OUTPUT
+        fi
+    
 
   create-endpoint:
     needs: create-custom-model
