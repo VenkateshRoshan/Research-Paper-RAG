@@ -50,12 +50,18 @@ jobs:
       id: build
       run: |
         VERSION=${GITHUB_REF_NAME:-latest}
-        CONTAINER_PATH=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${VERSION}
-        
-        docker build --build-arg GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }} -t ${CONTAINER_PATH} .
-        docker push ${CONTAINER_PATH}
-        
-        echo "container_path=${CONTAINER_PATH}" >> $GITHUB_OUTPUT
+        CONTAINER_PATH=gcr.io/$PROJECT_ID/$IMAGE_NAME:$VERSION
+
+        # Build and Push Docker Image
+        docker buildx build \
+        --build-arg GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }} \
+        --tag $CONTAINER_PATH \
+        --push \
+        .
+
+        # Output the container path
+        echo "container_path=$CONTAINER_PATH" >> $GITHUB_OUTPUT
+
 
   create-custom-model:
     needs: build-and-push
