@@ -75,7 +75,7 @@ jobs:
     - name: List Models
       id: list_models
       run: |
-        MODEL_ID=$(gcloud ai models list --region=${{ env.REGION }})
+        MODEL_ID=$(gcloud ai models list --region=${{ env.REGION }} --format="value(name)" --limit=1)
         echo "model_id=${MODEL_ID}" >> $GITHUB_ENV
     
     - name: Use Existing or Create Custom Model
