@@ -1,5 +1,10 @@
 name: Vertex AI Model Deployment
 
+# Add permissions at the workflow level
+permissions:
+    contents: read
+    id-token: write
+
 on:
   push:
     branches: [ main ]
