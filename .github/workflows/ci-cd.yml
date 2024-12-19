@@ -72,6 +72,10 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
 
+    - name: list models
+      run: |
+        gcloud ai models list --region=${{ env.REGION }}
+
     - name: Create Custom Model
       id: create_model
       run: |
