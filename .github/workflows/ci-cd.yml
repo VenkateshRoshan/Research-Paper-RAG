@@ -108,38 +108,39 @@ jobs:
       name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v1
       with:
-        workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-        service_account: ${{ env.SERVICE_ACCOUNT }}
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
 
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
 
-    - name: Check Existing Endpoint
-      id: check_endpoint
+      - name: List Endpoints
+      id: list_endpoints
       run: |
+        # Fetch the endpoint ID for the first matching endpoint
         ENDPOINT_ID=$(gcloud ai endpoints list \
           --region=${{ env.REGION }} \
-          --filter="displayName=${{ env.ENDPOINT_NAME }}" \
-          --format="get(name)" | cut -d'/' -f6)
-        
-        if [ -n "$ENDPOINT_ID" ]; then
-          echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Create New Endpoint
-      id: create_endpoint
-      if: steps.check_endpoint.outputs.exists != 'true'
+          --filter="display_name=${{ env.ENDPOINT_NAME }}" \
+          --format="value(name)" \
+          --limit=1)
+        echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_ENV
+    
+    - name: Use Existing or Create Endpoint
+      id: get_or_create_endpoint
       run: |
-        ENDPOINT_ID=$(gcloud ai endpoints create \
-          --region=${{ env.REGION }} \
-          --display-name=${{ env.ENDPOINT_NAME }} \
-          --service-account=${{ env.SERVICE_ACCOUNT }} \
-          --format="get(name)" | cut -d'/' -f6)
-        
+        if [ -z "${ENDPOINT_ID}" ]; then
+          echo "No existing endpoint found. Creating a new endpoint..."
+          ENDPOINT_ID=$(gcloud ai endpoints create \
+            --region=${{ env.REGION }} \
+            --display-name=${{ env.ENDPOINT_NAME }} \
+            --format="value(name)")
+          echo "Created new endpoint with ID: ${ENDPOINT_ID}"
+        else
+          echo "Using existing endpoint with ID: ${ENDPOINT_ID}"
+        fi
+    
+        # Export the endpoint ID for subsequent steps
         echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
+    
 
   deploy-model:
     needs: [create-custom-model, create-endpoint]
