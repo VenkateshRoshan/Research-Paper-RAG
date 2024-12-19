@@ -113,7 +113,7 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
 
-      - name: List Endpoints
+    - name: List Endpoints
       id: list_endpoints
       run: |
         # Fetch the endpoint ID for the first matching endpoint
