@@ -106,44 +106,48 @@ jobs:
     needs: create-custom-model
     runs-on: ubuntu-latest
     outputs:
-      endpoint_id: ${{ steps.create_endpoint.outputs.endpoint_id }}
+        endpoint_id: ${{ steps.get_or_create_endpoint.outputs.endpoint_id }}
     steps:
-    - id: auth
-      name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v1
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
+        - id: auth
+        - name: Authenticate to Google Cloud
+          uses: google-github-actions/auth@v1
+          with:
+            credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v1
+        - name: Set up Cloud SDK
+          uses: google-github-actions/setup-gcloud@v1
 
-    - name: List Endpoints
-      id: list_endpoints
-      run: |
-        # Fetch the endpoint ID for the first matching endpoint
-        ENDPOINT_ID=$(gcloud ai endpoints list \
-          --region=${{ env.REGION }} \
-          --filter="display_name=${{ env.ENDPOINT_NAME }}" \
-          --format="value(name)" \
-          --limit=1)
-        echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_ENV
-    
-    - name: Use Existing or Create Endpoint
-      id: get_or_create_endpoint
-      run: |
-        if [ -z "${ENDPOINT_ID}" ]; then
-        echo "No existing endpoint found. Creating a new endpoint..."
-        ENDPOINT_ID=$(gcloud ai endpoints create \
+        - name: List Endpoints
+          id: list_endpoints
+          run: |
+            # Fetch the endpoint ID for the first matching endpoint
+            ENDPOINT_ID=$(gcloud ai endpoints list \
             --region=${{ env.REGION }} \
-            --display-name=${{ env.ENDPOINT_NAME }} \
-            --format="value(name)")
-        echo "Created new endpoint with ID: ${ENDPOINT_ID}"
-        else
-        echo "Using existing endpoint with ID: ${ENDPOINT_ID}"
-        fi
-    
-        # Export the endpoint ID for subsequent steps
-        echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
+            --filter="display_name=${{ env.ENDPOINT_NAME }}" \
+            --format="value(name)" \
+            --limit=1)
+            
+            echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_ENV
+            echo "Endpoint ID found: ${ENDPOINT_ID}"
+
+        - name: Use Existing or Create Endpoint
+          id: get_or_create_endpoint
+          run: |
+            if [ -z "${ENDPOINT_ID}" ]; then
+            echo "No existing endpoint found. Creating a new endpoint..."
+            ENDPOINT_ID=$(gcloud ai endpoints create \
+                --region=${{ env.REGION }} \
+                --display-name=${{ env.ENDPOINT_NAME }} \
+                --format="value(name)")
+            echo "Created new endpoint with ID: ${ENDPOINT_ID}"
+            else
+            echo "Using existing endpoint with ID: ${ENDPOINT_ID}"
+            fi
+
+            # Export the endpoint ID for subsequent steps
+            echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
+            echo "Endpoint ID: ${ENDPOINT_ID}"
+
 
   deploy-model:
     needs: [create-custom-model, create-endpoint]
