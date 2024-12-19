@@ -100,6 +100,7 @@ jobs:
         
         # Export the model ID for use in later steps
         echo "model_id=${MODEL_ID}" >> $GITHUB_ENV
+        echo "Model ID=${MODEL_ID}" >> $GITHUB_OUTPUT
     
 
   create-endpoint:
@@ -118,7 +119,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
 
       - name: List Endpoints
-        id: list_endpoints
+        id: get_or_create_endpoint
         run: |
             # Fetch the endpoint ID for the first matching endpoint
             ENDPOINT_ID=$(gcloud ai endpoints list \
@@ -129,10 +130,7 @@ jobs:
             
             echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_ENV
             echo "Endpoint ID found: ${ENDPOINT_ID}"
-
-      - name: Use Existing or Create Endpoint
-        id: get_or_create_endpoint
-        run: |
+            
             if [ -z "${ENDPOINT_ID}" ]; then
             echo "No existing endpoint found. Creating a new endpoint..."
             ENDPOINT_ID=$(gcloud ai endpoints create \
