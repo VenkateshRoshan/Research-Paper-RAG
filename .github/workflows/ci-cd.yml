@@ -1,183 +1,156 @@
-name: RAG API CI/CD
+name: Vertex AI Model Deployment
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'requirements.txt'
-      - 'Dockerfile'
-      - '.github/workflows/**'
-  pull_request:
-    branches: [main]
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 env:
-  PYTHON_VERSION: '3.10'
-  DOCKER_IMAGE_NAME: research-paper-rag
-  DOCKER_IMAGE_TAG: ${{ github.sha }}
-  CUDA_VERSION: '11.8.0'
+  PROJECT_ID: research-paper-rag
+  REGION: us-central1
+  ARTIFACT_REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: rag-models
+  IMAGE_NAME: research-paper-rag
+  MODEL_NAME: research-paper-rag-model
+  ENDPOINT_NAME: rag-endpoint
+  DISPLAY_NAME: rag-host
+  MACHINE_TYPE: n1-standard-4
+  MIN_REPLICAS: 1
+  MAX_REPLICAS: 1
+  SERVICE_ACCOUNT: storage-admin-account@research-paper-rag.iam.gserviceaccount.com
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install --no-cache-dir -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov pytest-mock
-
-      - name: Run linting
-        run: |
-          pip install flake8
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --statistics
-
   build-and-push:
-    needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      container_uri: ${{ steps.build.outputs.container_path }}
     steps:
-      - uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+        service_account: ${{ env.SERVICE_ACCOUNT }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }}
 
-      - name: Google Auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+    - name: Build and Push Container
+      id: build
+      run: |
+        VERSION=${GITHUB_REF_NAME:-latest}
+        CONTAINER_PATH=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${VERSION}
+        
+        docker build -t ${CONTAINER_PATH} .
+        docker push ${CONTAINER_PATH}
+        
+        echo "container_path=${CONTAINER_PATH}" >> $GITHUB_OUTPUT
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker --quiet
-
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-            gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
-            gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache,mode=max
-          build-args: |
-            CUDA_VERSION=${{ env.CUDA_VERSION }}
-
-  deploy-vertex:
+  create-custom-model:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      model_id: ${{ steps.create_model.outputs.model_id }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+        service_account: ${{ env.SERVICE_ACCOUNT }}
 
-      - name: Google Auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+    - name: Create Custom Model
+      id: create_model
+      run: |
+        MODEL_ID=$(gcloud ai models upload \
+          --region=${{ env.REGION }} \
+          --display-name=${{ env.MODEL_NAME }} \
+          --container-image-uri=${{ needs.build-and-push.outputs.container_uri }} \
+          --service-account=${{ env.SERVICE_ACCOUNT }} \
+          --format="get(name)" | cut -d'/' -f6)
+        
+        echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
+        
+        # Wait for model to be ready
+        gcloud ai models wait $MODEL_ID --region=${{ env.REGION }}
 
-      - name: Upload model to Vertex AI
-        run: |
-          gcloud ai models upload \
-            --region=${{ secrets.GCP_REGION }} \
-            --display-name=research-paper-rag \
-            --container-image-uri=gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
-            --container-ports=8080 \
-            --container-predict-route=/predict \
-            --container-health-route=/health \
-            --machine-type=nvidia-tesla-t4 \
-            --accelerator-type=NVIDIA_TESLA_T4 \
-            --accelerator-count=1
+  create-endpoint:
+    needs: create-custom-model
+    runs-on: ubuntu-latest
+    outputs:
+      endpoint_id: ${{ steps.create_endpoint.outputs.endpoint_id }}
+    steps:
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+        service_account: ${{ env.SERVICE_ACCOUNT }}
 
-          MODEL_ID=$(gcloud ai models list \
-            --region=${{ secrets.GCP_REGION }} \
-            --filter="display_name=research-paper-rag" \
-            --format="value(name)" \
-            --limit=1)
-          echo "MODEL_ID=${MODEL_ID}" >> $GITHUB_ENV
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
 
-      - name: Deploy to Vertex AI endpoint
-        run: |
-          gcloud ai endpoints deploy-model ${{ secrets.VERTEX_ENDPOINT_ID }} \
-            --region=${{ secrets.GCP_REGION }} \
-            --model=${{ env.MODEL_ID }} \
-            --display-name=research-paper-rag-endpoint \
-            --machine-type=n1-standard-4 \
-            --min-replica-count=1 \
-            --max-replica-count=2 \
-            --accelerator-type=NVIDIA_TESLA_T4 \
-            --accelerator-count=1 \
-            --traffic-split=0=100 \
-            --quiet
+    - name: Check Existing Endpoint
+      id: check_endpoint
+      run: |
+        ENDPOINT_ID=$(gcloud ai endpoints list \
+          --region=${{ env.REGION }} \
+          --filter="displayName=${{ env.ENDPOINT_NAME }}" \
+          --format="get(name)" | cut -d'/' -f6)
+        
+        if [ -n "$ENDPOINT_ID" ]; then
+          echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
 
-      - name: Verify Deployment
-        run: |
-          sleep 180
-          
-          DEPLOYMENT_STATUS=$(gcloud ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
-            --region=${{ secrets.GCP_REGION }} \
-            --format='value(deployedModels[0].state)' --quiet)
-          
-          if [ "$DEPLOYMENT_STATUS" != "DEPLOYED" ]; then
-            echo "Deployment failed with status: $DEPLOYMENT_STATUS"
-            exit 1
-          fi
-          
-          ENDPOINT_URL=$(gcloud ai endpoints describe ${{ secrets.VERTEX_ENDPOINT_ID }} \
-            --region=${{ secrets.GCP_REGION }} \
-            --format='value(deployedModels[0].uri)' --quiet)
-          echo "Endpoint URL: $ENDPOINT_URL"
+    - name: Create New Endpoint
+      id: create_endpoint
+      if: steps.check_endpoint.outputs.exists != 'true'
+      run: |
+        ENDPOINT_ID=$(gcloud ai endpoints create \
+          --region=${{ env.REGION }} \
+          --display-name=${{ env.ENDPOINT_NAME }} \
+          --service-account=${{ env.SERVICE_ACCOUNT }} \
+          --format="get(name)" | cut -d'/' -f6)
+        
+        echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
 
-      - name: Deployment Summary
-        if: always()
-        run: |
-          echo "Deployment Status: ${{ job.status }}"
-          echo "Project ID: ${{ secrets.GCP_PROJECT_ID }}"
-          echo "Region: ${{ secrets.GCP_REGION }}"
-          echo "Endpoint ID: ${{ secrets.VERTEX_ENDPOINT_ID }}"
-          echo "Model ID: ${{ env.MODEL_ID }}"
-          echo "Docker Image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}"
+  deploy-model:
+    needs: [create-custom-model, create-endpoint]
+    runs-on: ubuntu-latest
+    steps:
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+        service_account: ${{ env.SERVICE_ACCOUNT }}
 
-      - name: Deployment Notification
-        if: always()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { status, conclusion } = context.job
-            const message = `Deployment to Vertex AI ${conclusion === 'success' ? 'succeeded' : 'failed'}`
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.name,
-              body: message
-            })
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Deploy Model to Endpoint
+      run: |
+        gcloud ai endpoints deploy-model ${{ needs.create-endpoint.outputs.endpoint_id }} \
+          --project=${{ env.PROJECT_ID }} \
+          --region=${{ env.REGION }} \
+          --model=${{ needs.create-custom-model.outputs.model_id }} \
+          --display-name=${{ env.DISPLAY_NAME }} \
+          --machine-type=${{ env.MACHINE_TYPE }} \
+          --min-replica-count=${{ env.MIN_REPLICAS }} \
+          --max-replica-count=${{ env.MAX_REPLICAS }} \
+          --service-account=${{ env.SERVICE_ACCOUNT }} \
+          --traffic-split=0=100

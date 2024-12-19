@@ -1,5 +1,5 @@
 # Use CUDA base image for GPU support
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
@@ -25,9 +25,14 @@ ENV AIP_PREDICT_ROUTE=/predict
 ENV AIP_HEALTH_ROUTE=/health
 ENV PORT=8080
 
+ENV PYTHONUNBUFFERED=True
+ENV GOOGLE_CLOUD_PROJECT=research-paper-rag
+
 # Create a non-root user
 RUN useradd -m -u 1000 appuser
 RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
 USER appuser
 
 # Expose the port

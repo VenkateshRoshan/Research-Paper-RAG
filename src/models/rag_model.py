@@ -15,13 +15,11 @@ class RAGModel:
                  model_name: str = "google/flan-t5-base",
                  max_length: int = 2048,
                  quantization: Optional[str] = None,
-                 gcs_bucket: str = None):
+                 gcs_bucket: str = None,
+                 credentials_path: str = "/app/research-paper-rag-0a8819b735b9.json"):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using device: {self.device}")
-
-        # Initialize tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         
         # Configure quantization
         if self.device.type == "cuda" and quantization:
@@ -31,18 +29,24 @@ class RAGModel:
             
         # Initialize model
         try:
-            self.model = self._initialize_model(model_name, quantization_config)
+            self.model = self._initialize_model(model_name, max_length, quantization_config)
         except Exception as e:
             logger.error(f"Error initializing model with quantization: {e}")
             logger.info("Falling back to default initialization")
-            self.model = self._initialize_model(model_name, None)
+            self.model = self._initialize_model(model_name, max_length, None)
 
         # Configure model parameters
         self._configure_model_parameters(max_length)
         
         # Initialize data loader
-        self.loader = DataLoader(bucket_name=gcs_bucket)
-        self.load_data()
+        self.loader = DataLoader(bucket_name=gcs_bucket,
+                                 credentials_path=credentials_path)
+        try:
+            self.loader.load_processed_data()
+        except Exception as e:
+            logger.warning(f"Could not load processed data: {e}")
+            logger.info("Processing new data...")
+            self.loader.load_and_process_data(sample_size=1000)
 
     def _get_quantization_config(self, quantization: str) -> Optional[BitsAndBytesConfig]:
         """Get quantization configuration based on specified type"""
@@ -61,8 +65,12 @@ class RAGModel:
             )
         return None
 
-    def _initialize_model(self, model_name: str, quantization_config: Optional[BitsAndBytesConfig]):
+    def _initialize_model(self, model_name: str, max_length: int, quantization_config: Optional[BitsAndBytesConfig]):
         """Initialize model with proper configuration"""
+        # Initialize tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+        # Initialize model
         model_class = T5ForConditionalGeneration if "t5" in model_name.lower() else AutoModelForSeq2SeqLM
         return model_class.from_pretrained(
             model_name,
