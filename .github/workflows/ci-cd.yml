@@ -61,7 +61,7 @@ jobs:
     # needs: build-and-push
     runs-on: ubuntu-latest
     outputs:
-      model_id: ${{ steps.create_model.outputs.model_id }}
+      model_id: ${{ steps.create_or_get_model.outputs.model_id }}
     steps:
     - id: auth
       name: Authenticate to Google Cloud
@@ -92,6 +92,12 @@ jobs:
             --display-name=${{ env.MODEL_NAME }} \
             --container-image-uri=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:main \
             --format="value(name)")
+
+          MODEL_ID=$(gcloud ai models list \
+            --region=us-central1 \
+            --format="value(name)" \
+            --filter="display_name=${{ env.MODEL_NAME }}" \
+            --limit=1)
           
           echo "Created new model with ID: ${MODEL_ID}"
         else
@@ -137,6 +143,11 @@ jobs:
                 --region=${{ env.REGION }} \
                 --display-name=${{ env.ENDPOINT_NAME }} \
                 --format="value(name)")
+            ENDPOINT_ID=$(gcloud ai endpoints list \
+            --region=${{ env.REGION }} \
+            --filter="display_name=${{ env.ENDPOINT_NAME }}" \
+            --format="value(name)" \
+            --limit=1)
             echo "Created new endpoint with ID: ${ENDPOINT_ID}"
             else
             echo "Using existing endpoint with ID: ${ENDPOINT_ID}"
