@@ -53,20 +53,19 @@ jobs:
         CONTAINER_PATH=gcr.io/$PROJECT_ID/$IMAGE_NAME:$VERSION
 
         echo "Building container image $CONTAINER_PATH"
-        echo "container_uri=$CONTAINER_PATH"
-        # echo "GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }}" >> $GITHUB_ENV
-
-        echo "${{ secrets.GCP_SA_KEY }}" | base64 > encoded-key.txt
-        echo "GOOGLE_APPLICATION_CREDENTIALS=$(cat encoded-key.txt)" >> $GITHUB_ENV
-
-        echo "GOOGLE_APPLICATION_CREDENTIALS=$(cat encoded-key.txt)"
+        
+        # Write credentials to a file
+        echo '${{ secrets.GCP_SA_KEY }}' > /tmp/credentials.json
 
         # Build and Push Docker Image
         docker buildx build \
-        --build-arg GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS \
+        --build-arg GOOGLE_APPLICATION_CREDENTIALS="$(cat /tmp/credentials.json)" \
         --tag $CONTAINER_PATH \
         --push \
         .
+
+        # Clean up credentials
+        rm /tmp/credentials.json
 
         # Output the container path
         echo "container_path=$CONTAINER_PATH" >> $GITHUB_OUTPUT
