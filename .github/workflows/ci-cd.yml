@@ -86,7 +86,7 @@ jobs:
         echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
         
         # Wait for model to be ready
-        gcloud ai models wait $MODEL_ID --region=${{ env.REGION }}
+        gcloud ai models $MODEL_ID --region=${{ env.REGION }}
 
   create-endpoint:
     needs: create-custom-model
