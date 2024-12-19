@@ -108,18 +108,18 @@ jobs:
     outputs:
         endpoint_id: ${{ steps.get_or_create_endpoint.outputs.endpoint_id }}
     steps:
-        - id: auth
-        - name: Authenticate to Google Cloud
-          uses: google-github-actions/auth@v1
-          with:
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
             credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-        - name: Set up Cloud SDK
-          uses: google-github-actions/setup-gcloud@v1
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
 
-        - name: List Endpoints
-          id: list_endpoints
-          run: |
+      - name: List Endpoints
+        id: list_endpoints
+        run: |
             # Fetch the endpoint ID for the first matching endpoint
             ENDPOINT_ID=$(gcloud ai endpoints list \
             --region=${{ env.REGION }} \
@@ -130,9 +130,9 @@ jobs:
             echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_ENV
             echo "Endpoint ID found: ${ENDPOINT_ID}"
 
-        - name: Use Existing or Create Endpoint
-          id: get_or_create_endpoint
-          run: |
+      - name: Use Existing or Create Endpoint
+        id: get_or_create_endpoint
+        run: |
             if [ -z "${ENDPOINT_ID}" ]; then
             echo "No existing endpoint found. Creating a new endpoint..."
             ENDPOINT_ID=$(gcloud ai endpoints create \
