@@ -103,7 +103,7 @@ jobs:
     
 
   create-endpoint:
-    needs: create-custom-model
+    # needs: create-custom-model
     runs-on: ubuntu-latest
     outputs:
         endpoint_id: ${{ steps.get_or_create_endpoint.outputs.endpoint_id }}
@@ -164,9 +164,14 @@ jobs:
 
     - name: Deploy Model to Endpoint
       run: |
-        gcloud ai endpoints deploy-model ${{ needs.create-endpoint.outputs.endpoint_id }} \
+        ENDPOINT_ID=${{ needs.create-endpoint.outputs.endpoint_id }}
+        MODEL_ID=${{ needs.create-custom-model.outputs.model_id }}
+
+        echo "Deploying model ${MODEL_ID} to endpoint ${ENDPOINT_ID}..."
+
+        gcloud ai endpoints deploy-model ${ENDPOINT_ID} \
           --region=${{ env.REGION }} \
-          --model=${{ needs.create-custom-model.outputs.model_id }} \
+          --model=${MODEL_ID} \
           --display-name=${{ env.DISPLAY_NAME }} \
           --machine-type=${{ env.MACHINE_TYPE }} \
           --min-replica-count=${{ env.MIN_REPLICAS }} \
