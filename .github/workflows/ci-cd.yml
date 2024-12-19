@@ -79,9 +79,7 @@ jobs:
         MODEL_ID=$(gcloud ai models upload \
           --region=${{ env.REGION }} \
           --display-name=${{ env.MODEL_NAME }} \
-          --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main \
-          --service-account=${{ env.SERVICE_ACCOUNT }} \
-          --format="get(name)" | cut -d'/' -f6)
+          --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main)
         
         echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
         
