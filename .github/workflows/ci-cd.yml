@@ -78,27 +78,24 @@ jobs:
         MODEL_ID=$(gcloud ai models list --region=us-central1 --format="value(name)" --limit=1)
         echo "model_id=${MODEL_ID}" >> $GITHUB_ENV
     
-        - name: Use Existing or Create Custom Model
-        id: get_or_create_model
-        run: |
-          if [ -z "${MODEL_ID}" ]; then
-            echo "No existing model found. Creating a new model..."
-            MODEL_ID=$(gcloud ai models upload \
-              --region=${{ env.REGION }} \
-              --display-name=${{ env.MODEL_NAME }} \
-              --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main \
-              --format="value(name)")
-            
-            echo "Created new model with ID: ${MODEL_ID}"
-          else
-            echo "Using existing model with ID: ${MODEL_ID}"
-          fi
-          
-          # Export the model ID for subsequent steps
-          echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
-      
-    
-    
+    - name: Use Existing or Create Custom Model
+      id: get_or_create_model
+      run: |
+        if [ -z "${MODEL_ID}" ]; then
+        echo "No existing model found. Creating a new model..."
+        MODEL_ID=$(gcloud ai models upload \
+            --region=${{ env.REGION }} \
+            --display-name=${{ env.MODEL_NAME }} \
+            --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main \
+            --format="value(name)")
+        
+        echo "Created new model with ID: ${MODEL_ID}"
+        else
+        echo "Using existing model with ID: ${MODEL_ID}"
+        fi
+        
+        # Export the model ID for subsequent steps
+        echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
 
   create-endpoint:
     needs: create-custom-model
