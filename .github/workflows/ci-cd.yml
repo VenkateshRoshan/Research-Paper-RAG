@@ -75,25 +75,27 @@ jobs:
     - name: List Models
       id: list_models
       run: |
-        MODELS=$(gcloud ai models list --region=${{ env.REGION }} --format="value(name)")
-        echo "models=${MODELS}" >> $GITHUB_ENV
+        MODEL_ID=$(gcloud ai models list --region=${{ env.REGION }} --format="value(name)" --limit=1)
+        echo "model_id=${MODEL_ID}" >> $GITHUB_ENV
     
-    - name: Conditionally Create Custom Model
-      id: create_model
+    - name: Use Existing or Create Custom Model
+      id: get_or_create_model
       run: |
-        if [ -z "${MODELS}" ]; then
+        if [ -z "${MODEL_ID}" ]; then
+          echo "No existing model found. Creating a new model..."
           MODEL_ID=$(gcloud ai models upload \
             --region=${{ env.REGION }} \
             --display-name=${{ env.MODEL_NAME }} \
             --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main)
           
-          echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
-          
-          # Wait for model to be ready
-          gcloud ai models describe $MODEL_ID --region=${{ env.REGION }}
+          echo "Created new model with ID: ${MODEL_ID}"
         else
-          echo "Existing models found. Skipping model creation." >> $GITHUB_OUTPUT
+          echo "Using existing model with ID: ${MODEL_ID}"
         fi
+    
+        # Export the model ID for subsequent steps
+        echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
+    
     
 
   create-endpoint:
