@@ -10,8 +10,7 @@ on:
 env:
   PROJECT_ID: research-paper-rag
   REGION: us-central1
-  ARTIFACT_REGISTRY: us-central1-docker.pkg.dev
-  REPOSITORY: rag-models
+  REPOSITORY: research-paper-rag
   IMAGE_NAME: research-paper-rag
   MODEL_NAME: research-paper-rag-model
   ENDPOINT_NAME: rag-endpoint
@@ -33,21 +32,20 @@ jobs:
       name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v1
       with:
-        workload_identity_provider: projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-        service_account: ${{ env.SERVICE_ACCOUNT }}
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
 
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
 
-    - name: Configure Docker for Artifact Registry
+    - name: Configure Docker for GCR
       run: |
-        gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }}
+        gcloud auth configure-docker gcr.io
 
     - name: Build and Push Container
       id: build
       run: |
         VERSION=${GITHUB_REF_NAME:-latest}
-        CONTAINER_PATH=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${VERSION}
+        CONTAINER_PATH=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${VERSION}
         
         docker build -t ${CONTAINER_PATH} .
         docker push ${CONTAINER_PATH}
