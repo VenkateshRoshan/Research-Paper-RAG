@@ -54,12 +54,12 @@ jobs:
 
         echo "Building container image $CONTAINER_PATH"
         echo "container_uri=$CONTAINER_PATH"
-        echo "GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }}"
+        echo "GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }}" >> $GITHUB_ENV
 
 
         # Build and Push Docker Image
         docker buildx build \
-        --build-arg GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }} \
+        --build-arg GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS \
         --tag $CONTAINER_PATH \
         --push \
         .
