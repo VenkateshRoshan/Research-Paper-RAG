@@ -103,7 +103,7 @@ jobs:
     
 
   create-endpoint:
-    # needs: create-custom-model
+    needs: create-custom-model
     runs-on: ubuntu-latest
     outputs:
         endpoint_id: ${{ steps.get_or_create_endpoint.outputs.endpoint_id }}
