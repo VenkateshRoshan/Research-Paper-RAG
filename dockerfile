@@ -1,5 +1,5 @@
 # Use CUDA base image for GPU support
-FROM python:3.10-slim
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
 # Set working directory
 WORKDIR /app
@@ -20,13 +20,14 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY src/ src/
 COPY main.py .
 
+# create the json file from an env variable
+ARG GOOGLE_APPLICATION_CREDENTIALS
+RUN echo $GOOGLE_APPLICATION_CREDENTIALS > /app/credentials.json
+
 # Set environment variables for Vertex AI
 ENV AIP_PREDICT_ROUTE=/predict
 ENV AIP_HEALTH_ROUTE=/health
 ENV PORT=8080
-
-ENV PYTHONUNBUFFERED=True
-ENV GOOGLE_CLOUD_PROJECT=research-paper-rag
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser

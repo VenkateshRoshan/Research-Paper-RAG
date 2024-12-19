@@ -26,39 +26,39 @@ env:
   SERVICE_ACCOUNT: storage-admin-account@research-paper-rag.iam.gserviceaccount.com
 
 jobs:
-#   build-and-push:
-#     runs-on: ubuntu-latest
-#     outputs:
-#       container_uri: ${{ steps.build.outputs.container_path }}
-#     steps:
-#     - uses: actions/checkout@v3
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      container_uri: ${{ steps.build.outputs.container_path }}
+    steps:
+    - uses: actions/checkout@v3
 
-#     - id: auth
-#       name: Authenticate to Google Cloud
-#       uses: google-github-actions/auth@v1
-#       with:
-#         credentials_json: ${{ secrets.GCP_SA_KEY }}
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-#     - name: Set up Cloud SDK
-#       uses: google-github-actions/setup-gcloud@v1
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
 
-#     - name: Configure Docker for GCR
-#       run: |
-#         gcloud auth configure-docker gcr.io
+    - name: Configure Docker for GCR
+      run: |
+        gcloud auth configure-docker gcr.io
 
-#     - name: Build and Push Container
-#       id: build
-#       run: |
-#         VERSION=${GITHUB_REF_NAME:-latest}
-#         CONTAINER_PATH=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${VERSION}
+    - name: Build and Push Container
+      id: build
+      run: |
+        VERSION=${GITHUB_REF_NAME:-latest}
+        CONTAINER_PATH=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${VERSION}
         
-#         docker build -t ${CONTAINER_PATH} .
-#         docker push ${CONTAINER_PATH}
+        docker build --build-arg GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }} -t ${CONTAINER_PATH} .
+        docker push ${CONTAINER_PATH}
         
-#         echo "container_path=${CONTAINER_PATH}" >> $GITHUB_OUTPUT
+        echo "container_path=${CONTAINER_PATH}" >> $GITHUB_OUTPUT
 
   create-custom-model:
-    # needs: build-and-push
+    needs: build-and-push
     runs-on: ubuntu-latest
     outputs:
       model_id: ${{ steps.create_or_get_model.outputs.model_id }}

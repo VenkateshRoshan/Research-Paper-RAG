@@ -16,6 +16,6 @@ src/monitoring/__pycache__/
 
 venv/
 
-research-paper-rag-0a8819b735b9.json
+secret.json
 
 Working/

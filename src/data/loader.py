@@ -56,19 +56,17 @@ class DataLoader:
             except ImportError:
                 pass
 
-            # # Second try: Use provided credentials file
-            # if credentials_path and os.path.isfile(credentials_path):
-            #     logger.info(f"Using provided credentials file: {credentials_path}")
-            #     credentials = service_account.Credentials.from_service_account_file(
-            #         credentials_path)
-            #     return storage.Client(credentials=credentials)
+            # Second try: Use provided credentials file
+            if credentials_path and os.path.isfile(credentials_path):
+                logger.info(f"Using provided credentials file: {credentials_path}")
+                credentials = service_account.Credentials.from_service_account_file(
+                    credentials_path)
+                return storage.Client(credentials=credentials)
 
-            # # Third try: Use application default credentials
-            # logger.info("Attempting to use application default credentials")
-            # credentials, project = google.auth.default()
-            # return storage.Client(credentials=credentials, project=project)
-
-            return storage.Client()
+            # Third try: Use application default credentials
+            logger.info("Attempting to use application default credentials")
+            credentials, project = google.auth.default()
+            return storage.Client(credentials=credentials, project=project)
 
         except Exception as e:
             logger.error(f"Error initializing storage client: {e}")
