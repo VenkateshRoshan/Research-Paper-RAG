@@ -78,23 +78,25 @@ jobs:
         MODEL_ID=$(gcloud ai models list --region=${{ env.REGION }} --format="value(name)" --limit=1)
         echo "model_id=${MODEL_ID}" >> $GITHUB_ENV
     
-    - name: Use Existing or Create Custom Model
-      id: get_or_create_model
-      run: |
-        if [ -z "${MODEL_ID}" ]; then
-          echo "No existing model found. Creating a new model..."
-          MODEL_ID=$(gcloud ai models upload \
-            --region=${{ env.REGION }} \
-            --display-name=${{ env.MODEL_NAME }} \
-            --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main)
+        - name: Use Existing or Create Custom Model
+        id: get_or_create_model
+        run: |
+          if [ -z "${MODEL_ID}" ]; then
+            echo "No existing model found. Creating a new model..."
+            MODEL_ID=$(gcloud ai models upload \
+              --region=${{ env.REGION }} \
+              --display-name=${{ env.MODEL_NAME }} \
+              --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main \
+              --format="value(name)")
+            
+            echo "Created new model with ID: ${MODEL_ID}"
+          else
+            echo "Using existing model with ID: ${MODEL_ID}"
+          fi
           
-          echo "Created new model with ID: ${MODEL_ID}"
-        else
-          echo "Using existing model with ID: ${MODEL_ID}"
-        fi
-    
-        # Export the model ID for subsequent steps
-        echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
+          # Export the model ID for subsequent steps
+          echo "model_id=${MODEL_ID}" >> $GITHUB_OUTPUT
+      
     
     
 
@@ -128,19 +130,18 @@ jobs:
       id: get_or_create_endpoint
       run: |
         if [ -z "${ENDPOINT_ID}" ]; then
-          echo "No existing endpoint found. Creating a new endpoint..."
-          ENDPOINT_ID=$(gcloud ai endpoints create \
+        echo "No existing endpoint found. Creating a new endpoint..."
+        ENDPOINT_ID=$(gcloud ai endpoints create \
             --region=${{ env.REGION }} \
             --display-name=${{ env.ENDPOINT_NAME }} \
             --format="value(name)")
-          echo "Created new endpoint with ID: ${ENDPOINT_ID}"
+        echo "Created new endpoint with ID: ${ENDPOINT_ID}"
         else
-          echo "Using existing endpoint with ID: ${ENDPOINT_ID}"
+        echo "Using existing endpoint with ID: ${ENDPOINT_ID}"
         fi
     
         # Export the endpoint ID for subsequent steps
         echo "endpoint_id=${ENDPOINT_ID}" >> $GITHUB_OUTPUT
-    
 
   deploy-model:
     needs: [create-custom-model, create-endpoint]
@@ -158,7 +159,6 @@ jobs:
     - name: Deploy Model to Endpoint
       run: |
         gcloud ai endpoints deploy-model ${{ needs.create-endpoint.outputs.endpoint_id }} \
-          --project=${{ env.PROJECT_ID }} \
           --region=${{ env.REGION }} \
           --model=${{ needs.create-custom-model.outputs.model_id }} \
           --display-name=${{ env.DISPLAY_NAME }} \
@@ -166,3 +166,4 @@ jobs:
           --min-replica-count=${{ env.MIN_REPLICAS }} \
           --max-replica-count=${{ env.MAX_REPLICAS }} \
           --traffic-split=0=100
+    
