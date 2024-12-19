@@ -52,6 +52,11 @@ jobs:
         VERSION=${GITHUB_REF_NAME:-latest}
         CONTAINER_PATH=gcr.io/$PROJECT_ID/$IMAGE_NAME:$VERSION
 
+        echo "Building container image $CONTAINER_PATH"
+        echo "container_uri=$CONTAINER_PATH"
+        echo "GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }}"
+
+
         # Build and Push Docker Image
         docker buildx build \
         --build-arg GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GCP_SA_KEY }} \
