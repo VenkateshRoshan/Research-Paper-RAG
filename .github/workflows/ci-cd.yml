@@ -58,7 +58,7 @@ jobs:
         echo "container_path=${CONTAINER_PATH}" >> $GITHUB_OUTPUT
 
   create-custom-model:
-    needs: build-and-push
+    # needs: build-and-push
     runs-on: ubuntu-latest
     outputs:
       model_id: ${{ steps.create_model.outputs.model_id }}
@@ -79,7 +79,8 @@ jobs:
         MODEL_ID=$(gcloud ai models upload \
           --region=${{ env.REGION }} \
           --display-name=${{ env.MODEL_NAME }} \
-          --container-image-uri=${{ needs.build-and-push.outputs.container_uri }} \
+        #   --container-image-uri=${{ needs.build-and-push.outputs.container_uri }} \
+          --container-image-uri=gcr.io/research-paper-rag/research-paper-rag:main \
           --service-account=${{ env.SERVICE_ACCOUNT }} \
           --format="get(name)" | cut -d'/' -f6)
         
