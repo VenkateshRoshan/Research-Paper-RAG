@@ -54,24 +54,16 @@ jobs:
 
         echo "Building container image $CONTAINER_PATH"
 
-        # Base64 encode the credentials
-        CREDS_B64=$(echo '${{ secrets.GCP_SA_KEY }}' | base64 -w 0)
+        # Properly encode credentials in base64
+        CREDS_B64=$(echo '${{ secrets.GCP_SA_KEY }}' | base64 | tr -d '\n')
         
-        # Write credentials to a file
-        echo '${{ secrets.GCP_SA_KEY }}' > /tmp/credentials.json
-
-        # print the credentials
-        echo "Credentials: $(cat /tmp/credentials.json)"
-
-        # Build and Push Docker Image
+        echo "Building container image $CONTAINER_PATH with credentials $CREDS_B64"
+        
         docker buildx build \
-        --build-arg GOOGLE_APPLICATION_CREDENTIALS="$(cat /tmp/credentials.json)" \
+        --build-arg GOOGLE_APPLICATION_CREDENTIALS="$CREDS_B64" \
         --tag $CONTAINER_PATH \
         --push \
         .
-
-        # Clean up credentials
-        rm /tmp/credentials.json
 
         # Output the container path
         echo "container_path=$CONTAINER_PATH" >> $GITHUB_OUTPUT
