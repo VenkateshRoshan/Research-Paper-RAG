@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 def main():
     try:
         # Initialize DataLoader
-        loader = DataLoader()
-        loader.load_and_process_data(sample_size=1000) # testing sample size of 1000
+        loader = DataLoader(bucket_name='research-paper-rag-data')
+        loader.load_and_process_data(sample_size=25000) # testing sample size of 1000
 
         # test search
         test_query = 'transformer architecture in deep learning'

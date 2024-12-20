@@ -133,10 +133,14 @@ class DataLoader:
             abstracts = self.papers_data['abstract'].tolist()
             embeddings = self.embedder.encode(abstracts, show_progress_bar=True)
 
+            logger.info("Creating FAISS index...")
+
             # Create FAISS index
             dimension = embeddings.shape[1]
             self.index = faiss.IndexFlatL2(dimension)
             self.index.add(np.array(embeddings).astype('float32'))
+
+            logger.info("Data processed successfully")
 
             # Save files using temporary directory
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -146,13 +150,14 @@ class DataLoader:
 
                 # Save files locally
                 self.papers_data.to_pickle(str(papers_path))
-                with open(embeddings_path, 'wb') as f:
-                    pickle.dump(embeddings, f)
+                # with open(embeddings_path, 'wb') as f:
+                #     pickle.dump(embeddings, f)
                 faiss.write_index(self.index, str(index_path))
 
                 # Upload to GCS
+                logger.info("Uploading data to GCS...")
                 self.save_to_gcs(str(papers_path), 'papers_data.pkl')
-                self.save_to_gcs(str(embeddings_path), 'embeddings.pkl')
+                logger.info("Uploading index...")
                 self.save_to_gcs(str(index_path), 'faiss.index')
 
             logger.info("Data processed and uploaded to GCS successfully")

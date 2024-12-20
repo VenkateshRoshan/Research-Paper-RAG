@@ -41,6 +41,7 @@ class RAGModel:
         # Initialize data loader
         self.loader = DataLoader(bucket_name=gcs_bucket,
                                  credentials_path=credentials_path)
+        logger.info('credentials_path',credentials_path)
         try:
             self.loader.load_processed_data()
         except Exception as e:
