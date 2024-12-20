@@ -45,6 +45,9 @@ class DataLoader:
         self.index = None
         self.papers_data = None
 
+        # save data to GCS
+        # self.load_and_process_data()
+
     def _initialize_storage_client(self, credentials_path: str = None) -> storage.Client:
         """Initialize storage client with support for both environments"""
         try:

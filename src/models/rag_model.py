@@ -46,7 +46,7 @@ class RAGModel:
         except Exception as e:
             logger.warning(f"Could not load processed data: {e}")
             logger.info("Processing new data...")
-            self.loader.load_and_process_data(sample_size=10000)
+            self.loader.load_and_process_data(sample_size=None)
 
     def _get_quantization_config(self, quantization: str) -> Optional[BitsAndBytesConfig]:
         """Get quantization configuration based on specified type"""
