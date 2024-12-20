@@ -40,3 +40,7 @@ python-multipart==0.0.6
 httpx
 
 google-cloud-storage
+
+# For Inference
+google-cloud-aiplatform
+gradio
