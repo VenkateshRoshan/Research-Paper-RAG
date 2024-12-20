@@ -22,7 +22,8 @@ COPY main.py .
 
 # create the json file from an env variable
 ARG GOOGLE_APPLICATION_CREDENTIALS
-RUN echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > /app/credentials.json
+RUN echo "${GOOGLE_APPLICATION_CREDENTIALS}" | base64 -d > /app/credentials.json && \
+    chmod 600 /app/credentials.json
 
 # Set environment variables for Vertex AI
 
