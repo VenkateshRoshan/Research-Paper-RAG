@@ -25,6 +25,7 @@ ARG GOOGLE_APPLICATION_CREDENTIALS
 RUN echo "$GOOGLE_APPLICATION_CREDENTIALS" > /app/credentials.json
 
 # Set environment variables for Vertex AI
+
 ENV AIP_PREDICT_ROUTE=/predict
 ENV AIP_HEALTH_ROUTE=/health
 ENV PORT=8080
