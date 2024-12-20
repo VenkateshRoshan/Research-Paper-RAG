@@ -64,6 +64,7 @@ class DataLoader:
                 logger.info(f"Using provided credentials file: {credentials_path}")
                 credentials = service_account.Credentials.from_service_account_file(
                     credentials_path)
+                logger.info(f"Credentials: {credentials}")
                 return storage.Client(credentials=credentials)
 
             # Third try: Use application default credentials
