@@ -21,7 +21,7 @@ class DataLoader:
     def __init__(self, 
                  bucket_name: str = None, 
                  cache_dir: str = "data/processed",
-                 credentials_path: str = "/app/research-paper-rag-0a8819b735b9.json",
+                 credentials_path: str = "/app/credentials.json",
                  embedding_model: str = 'all-MiniLM-L6-v2'):
         """
         Initialize the DataLoader with support for both local and Vertex AI environments

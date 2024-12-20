@@ -6,6 +6,7 @@ import logging
 from src.data.loader import DataLoader
 from datetime import datetime
 from transformers import BitsAndBytesConfig
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ class RAGModel:
                  max_length: int = 2048,
                  quantization: Optional[str] = None,
                  gcs_bucket: str = None,
-                 credentials_path: str = "/app/research-paper-rag-0a8819b735b9.json"):
+                 credentials_path: str = "/app/credentials.json"):
         
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using device: {self.device}")
